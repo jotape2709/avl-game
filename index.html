@@ -5,7 +5,6 @@
 <aside><div class="brand"><i data-i="tree"></i>Arbor<span>Lab</span></div><div class="sideLabel">ESTUDO</div><nav><button data-page="arena"><i data-i="target"></i>Arena de treino</button><button data-page="lab"><i data-i="flask"></i>Laboratório livre</button><button data-page="progress"><i data-i="chart"></i>Meu progresso</button></nav><div class="sfoot"><div class="avatar">JP</div><div>Área de estudo<small>Progresso local</small></div></div></aside>
 <main><header><div>Workspace <span>/</span> <b id="crumb"></b></div><div class="xp"><i data-i="bolt"></i><strong id="xp"></strong> XP</div></header><article id="app"></article></main><script>const height = n => n ? 1 + Math.max(height(n.l), height(n.r)) : 0;
 const fb = n => height(n.l) - height(n.r);
-const rotations = ['Simples à direita','Simples à esquerda','Dupla esquerda-direita','Dupla direita-esquerda'];
 function turn(n, left) {
   const near = left ? 'r' : 'l', far = left ? 'l' : 'r', pivot = n[near];
   n[near] = pivot[far]; pivot[far] = n; return pivot;
@@ -23,7 +22,6 @@ function insert(n, v, avl=false, log=[]) {
   n[side]=insert(n[side],v,avl,log);
   const c=avl?rotationCase(n):-1;
   if(c<0) return n;
-  log.push(rotations[c]+' no nó '+n.v+' (FB '+fb(n)+')');
   if(c===2) n.l=turn(n.l,true);
   if(c===3) n.r=turn(n.r,false);
   return turn(n,c===1||c===3);
@@ -44,7 +42,7 @@ const pick=a=>a[Math.floor(Math.random()*a.length)];
 const numbers=n=>shuffle(Array.from({length:90},(_,i)=>i+10)).slice(0,n);
 const build=(values,avl=false)=>values.reduce((n,v)=>insert(n,v,avl),null);
 const rules={'pré-ordem':'Raiz, esquerda, direita.','em-ordem':'Esquerda, raiz, direita.','pós-ordem':'Esquerda, direita, raiz.'};
-const topics=['Percursos','Inserção BST','Alturas e fatores','Reconhecer AVL','Rotações AVL'];
+const topics=['Percursos','Inserção BST','Alturas e fatores','Reconhecer AVL','Busca na BST','Menor e maior na BST','Altura da subárvore','Comparar os lados','Equilíbrio de um nó'];
 function question(topic,first=false){
   let vals=numbers(first?7:pick([5,6,7,8,9])), tree=build(vals,first||Math.random()<0.45);
   let title,hint,answer,choices,explain,focus=null,after=null,trace=[];
@@ -70,20 +68,56 @@ function question(topic,first=false){
   }else if(topic===3){
     const bad=walk(tree).filter(n=>Math.abs(fb(n))>1);answer=bad.length?'Não':'Sim';choices=['Sim','Não'];title='Esta BST também é uma AVL?';hint='Confira todos os nós. Cada fator precisa estar entre −1 e +1.';
     explain=bad.length?'Nós desequilibrados: '+bad.map(n=>n.v+' (FB '+fb(n)+')').join(', ')+'.':'Todos os nós têm FB igual a −1, 0 ou +1.';focus=bad[0]?.v;
-  }else{
-    const [a,b,c]=numbers(3).sort((a,b)=>a-b),seq=pick([[c,b,a],[a,b,c],[c,a,b],[a,c,b]]);
-    tree=build(seq);focus=tree.v;const k=rotationCase(tree);answer=rotations[k];choices=rotations;
-    title='Qual rotação corrige o nó '+tree.v+'?';hint='Siga os dois passos da raiz até o último valor inserido. Um zigue-zague exige duas rotações.';
-    explain='Inserção '+seq.join(' → ')+'. Caminho '+['esquerda–esquerda','direita–direita','esquerda–direita','direita–esquerda'][k]+'. '+answer+' deixa '+b+' na raiz.';after=build(seq,true);
+  }else if(topic===4){
+    const target=pick(walk(tree).filter(n=>n!==tree)); let n=tree;
+    while(n){trace.push(n.v);if(n===target)break;n=target.v<n.v?n.l:n.r;}
+    title='Qual nó vem logo antes de '+target.v+' na busca pela raiz?';
+    answer=String(trace.at(-2));choices=nodeOptions(tree,answer);
+    hint='Compare o valor procurado com cada nó. Menor segue à esquerda, maior à direita.';
+    explain='A busca visita '+trace.join(' → ')+'. O penúltimo nó é '+answer+'.';
+  }else if(topic===5){
+    const min=Math.random()<0.5,side=min?'l':'r';let n=tree;
+    while(n){trace.push(n.v);n=n[side];}
+    title='Qual é o '+(min?'menor':'maior')+' valor desta BST?';
+    answer=String(trace.at(-1));choices=nodeOptions(tree,answer);
+    hint='A partir da raiz, siga sempre à '+(min?'esquerda':'direita')+'.';
+    explain='O caminho é '+trace.join(' → ')+'. O último nó contém o extremo procurado.';
+  }else if(topic===6){
+    const n=pick(walk(tree).filter(n=>n.l||n.r)),side=pick(['l','r']),name=side==='l'?'esquerda':'direita';
+    focus=n.v;title='Qual é a altura da subárvore '+name+' de '+n.v+', contando nós?';
+    let child=n[side];
+    while(child){trace.push(child.v);child=height(child.l)>=height(child.r)?child.l:child.r;}
+    answer=String(height(n[side]));choices=[answer,...shuffle(Array.from({length:9},(_,i)=>String(i)).filter(x=>x!==answer)).slice(0,3)];
+    hint='Comece no filho do lado pedido. Conte os nós até a folha mais distante. Um lado vazio vale zero.';
+    explain=trace.length?'Um caminho mais longo desse lado é '+trace.join(' → ')+'. Ele tem '+answer+' nó(s).':'Esse lado está vazio, por isso a altura é 0.';
+  }else if(topic===7||topic===8){
+    const n=pick(walk(tree).filter(n=>n.l||n.r));focus=n.v;
+    const delta=fb(n),detail='Em '+n.v+', altura esquerda = '+height(n.l)+' e altura direita = '+height(n.r)+'. FB = '+height(n.l)+' − '+height(n.r)+' = '+delta+'.';
+    if(topic===7){
+      title='Qual lado do nó '+n.v+' tem maior altura?';
+      choices=['Esquerdo','Direito','As alturas são iguais'];answer=choices[delta>0?0:delta<0?1:2];
+      hint='Compare o caminho mais longo à esquerda com o mais longo à direita.';
+      explain=detail+' '+(delta===0?'As alturas são iguais.':'O lado '+answer.toLowerCase()+' é mais alto.');
+    }else{
+      title='O nó '+n.v+' satisfaz a condição de equilíbrio da AVL?';
+      choices=['Sim','Não'];answer=Math.abs(delta)<=1?'Sim':'Não';
+      hint='Analise apenas o nó marcado. As duas alturas podem diferir em até um.';
+      explain=detail+' A diferença absoluta é '+Math.abs(delta)+'. O limite permitido é 1.';
+    }
   }
   return {topic,tree,title,hint,answer,choices:shuffle(choices),explain,focus,after,trace};
+}
+
+function nodeOptions(tree,answer){
+  const others=walk(tree).map(n=>String(n.v)).filter(v=>v!==answer);
+  return [answer,...shuffle(others).slice(0,3)];
 }
 </script><script>const paths={tree:'M12 7v4M5 15v-4h14v4 M9 2h6v5H9z M2 15h6v6H2z M16 15h6v6h-6z',target:'M21 12a9 9 0 1 1-9-9 M17 12a5 5 0 1 1-5-5 M12 12l8-8 M17 4h3v3',flask:'M9 3h6 M10 3v7L4 19q-1 2 2 2h12q3 0 2-2l-6-9V3 M7 15h10',chart:'M4 3v17h17 M8 16v-4 M13 16V8 M18 16V5',bolt:'M14 2L4 14h7l-1 8 10-13h-7z',fire:'M13 2q2 6 5 9c5 8-4 14-10 9q-6-4-2-11l3 3q4-3 4-10z',check:'M3 12l6 6L21 6',shuffle:'M3 6h3c5 0 7 12 12 12h3 M17 14l4 4-4 4 M3 18h3q3 0 5-4 M14 9q2-3 4-3h3 M17 2l4 4-4 4',layers:'M12 3l10 5-10 5L2 8z M3 13l9 5 9-5 M3 17l9 5 9-5',book:'M3 4q5-1 9 2 4-3 9-2v15q-5-1-9 2-4-3-9-2z M12 6v15'};
 const icon=k=>'<i data-i="'+k+'" aria-hidden="true"></i>';
 function icons(){document.querySelectorAll('i[data-i]').forEach(i=>i.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="'+paths[i.dataset.i]+'"/></svg>');}
 const pages={arena:'Arena de treino',lab:'Laboratório livre',progress:'Meu progresso'};
 let stats={total:0,hits:0,streak:0,best:0,by:topics.map(()=>[0,0])};
-try{const s=JSON.parse(localStorage.getItem('arbor-v1'));if(s&&s.by?.length===5)stats=s;}catch{}
+try{const s=JSON.parse(localStorage.getItem('arbor-v1'));if(s&&Array.isArray(s.by)){const legacy=s.by.length===5;stats={...s,by:topics.map((_,i)=>(legacy&&i>=4?null:s.by[i])||[0,0])};}}catch{}
 let page='arena',filter=-1,q=question(0,true),round=1,selected=null,done=false,hinted=false,showAfter=false,step=-1;
 let labValues=numbers(7),labAVL=true,labRoot=build(labValues,true),labLog='Árvore inicial gerada.',inspect=null;
 const app=document.querySelector('#app');
@@ -102,7 +136,7 @@ function arena(){
  const filterUI='<select aria-label="Tema dos desafios" id="topic"><option value="-1">Todos os temas</option>'+topics.map((t,i)=>'<option value="'+i+'" '+(i===filter?'selected':'')+'>'+t+'</option>').join('')+'</select>';
  const target=step>=0?q.trace[step]:q.topic===3&&!done?null:q.focus;
  const opts=q.choices.map((c,i)=>button('choose', '<b>'+String.fromCharCode(65+i)+'</b>'+c,'opt '+(done&&c===q.answer?'good':done&&c===selected?'bad':selected===c?'sel':''),'data-index="'+i+'" aria-pressed="'+(selected===c)+'" '+(done?'disabled':''))).join('');
- return pageHeading('ESTRUTURA DE DADOS',pages.arena,'Resolva desafios com árvores geradas a cada rodada.',filterUI)+statCards()+'<div class="game"><div>'+board(showAfter?q.after:q.tree,target,false,showAfter&&q.topic===4?'AVL':'BST')+(done&&q.after?button('after',showAfter?'Ver antes':'Ver árvore depois','action below'):'')+(done&&q.trace.length?'<div class="note">'+button('trace','Visitar próximo nó')+' '+(step>=0?'Passo '+(step+1)+' de '+q.trace.length+' · nó '+q.trace[step]:'Percorra a solução nó por nó.')+'</div>':'')+'</div><section class="card pad"><div class="panelTitle">'+icon('target')+' DESAFIO '+String(round).padStart(2,'0')+' · '+topics[q.topic].toUpperCase()+'</div><h3>'+q.title+'</h3>'+opts+(done?'<div role="status" class="feedback"><b>'+(selected===q.answer?'Acertou! +10 XP':'Resposta correta: '+q.answer)+'</b><br>'+q.explain+'</div>'+button('next','Próximo desafio','primary wide'):button('verify',icon('check')+'Conferir resposta','primary wide',selected===null?'disabled':'')+button('hint',hinted?'Ocultar dica':'Preciso de uma dica','link')+(hinted?'<div class="note">'+q.hint+'</div>':''))+'</section></div>';
+ return pageHeading('ESTRUTURA DE DADOS',pages.arena,'Resolva desafios com árvores geradas a cada rodada.',filterUI)+statCards()+'<div class="game"><div>'+board(showAfter?q.after:q.tree,target,false,'BST')+(done&&q.after?button('after',showAfter?'Ver antes':'Ver árvore depois','action below'):'')+(done&&q.trace.length?'<div class="note">'+button('trace','Visitar próximo nó')+' '+(step>=0?'Passo '+(step+1)+' de '+q.trace.length+' · nó '+q.trace[step]:'Percorra a solução nó por nó.')+'</div>':'')+'</div><section class="card pad"><div class="panelTitle">'+icon('target')+' DESAFIO '+String(round).padStart(2,'0')+' · '+topics[q.topic].toUpperCase()+'</div><h3>'+q.title+'</h3>'+opts+(done?'<div role="status" class="feedback"><b>'+(selected===q.answer?'Acertou! +10 XP':'Resposta correta: '+q.answer)+'</b><br>'+q.explain+'</div>'+button('next','Próximo desafio','primary wide'):button('verify',icon('check')+'Conferir resposta','primary wide',selected===null?'disabled':'')+button('hint',hinted?'Ocultar dica':'Preciso de uma dica','link')+(hinted?'<div class="note">'+q.hint+'</div>':''))+'</section></div>';
 }
 function lab(){
  const n=walk(labRoot).find(n=>n.v===inspect);
@@ -110,7 +144,8 @@ function lab(){
 }
 function progressPage(){return pageHeading('HISTÓRICO LOCAL',pages.progress,'Acompanhe seus acertos por assunto neste navegador.')+statCards()+'<section class="card pad"><div class="panelTitle">'+icon('chart')+' DESEMPENHO</div><h3>Acertos por tema</h3>'+topics.map((t,i)=>{const [all,correct]=stats.by[i];return '<div class="history"><div class="row"><strong>'+t+'</strong><small>'+correct+' de '+all+'</small></div><div class="track"><span style="width:'+(all?100*correct/all:0)+'%"></span></div></div>';}).join('')+'<p>Melhor sequência: '+stats.best+' acertos seguidos.</p></section>';}
 function render(){document.querySelector('#crumb').textContent=pages[page];document.querySelector('#xp').textContent=stats.hits*10;document.querySelectorAll('[data-page]').forEach(b=>{b.classList.toggle('active',b.dataset.page===page);b.setAttribute('aria-label',pages[b.dataset.page]);});app.innerHTML=page==='arena'?arena():page==='lab'?lab():progressPage();icons();}
-function next(){round++;q=question(filter<0?pick([0,1,2,3,4]):filter);selected=null;done=false;hinted=false;showAfter=false;step=-1;}
+let topicBag=shuffle(topics.map((_,i)=>i).slice(1));
+function next(){round++;if(!topicBag.length)topicBag=shuffle(topics.map((_,i)=>i));q=question(filter<0?topicBag.pop():filter);selected=null;done=false;hinted=false;showAfter=false;step=-1;}
 function rebuild(msg){labRoot=build(labValues,labAVL);inspect=null;labLog=msg;}
 document.addEventListener('click',e=>{
  const b=e.target.closest('button,[data-node]');if(!b)return;
